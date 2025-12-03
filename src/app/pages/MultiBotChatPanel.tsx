@@ -1,7 +1,7 @@
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
 import { sample, uniqBy } from 'lodash-es'
-import { FC, Suspense, useCallback, useEffect, useMemo } from 'react'
+import { FC, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '~/utils'
 import Button from '~app/components/Button'
@@ -12,8 +12,10 @@ import { useChat } from '~app/hooks/use-chat'
 import { usePremium } from '~app/hooks/use-premium'
 import { trackEvent } from '~app/plausible'
 import { showPremiumModalAtom } from '~app/state'
+import Toggle from '~app/components/Toggle'
 import { BotId } from '../bots'
 import ConversationPanel from '../components/Chat/ConversationPanel'
+import { uuid } from '~utils'
 
 const DEFAULT_BOTS: BotId[] = Object.keys(CHATBOTS).slice(0, 6) as BotId[]
 
@@ -22,6 +24,30 @@ const twoPanelBotsAtom = atomWithStorage<BotId[]>('multiPanelBots:2', DEFAULT_BO
 const threePanelBotsAtom = atomWithStorage<BotId[]>('multiPanelBots:3', DEFAULT_BOTS.slice(0, 3))
 const fourPanelBotsAtom = atomWithStorage<BotId[]>('multiPanelBots:4', DEFAULT_BOTS.slice(0, 4))
 const sixPanelBotsAtom = atomWithStorage<BotId[]>('multiPanelBots:6', DEFAULT_BOTS.slice(0, 6))
+const autoSummarizeAtom = atomWithStorage<boolean>('autoSummarize', false)
+
+interface PendingSummaryState {
+  roundId: string
+  startCounts: Record<BotId, number>
+  createdAt: number
+}
+
+const SUMMARY_TIMEOUT = 30_000
+
+function generateSummaryPrompt(responses: { label: string; text: string }[]) {
+  const content = responses
+    .map(({ label, text }) => `[${label}]: ${text}`)
+    .join('\n')
+
+  return `[系统指令: You are a strict logic judge and aggregator.]
+以下是针对同一个问题，不同 AI 模型给出的回答。请分析这些回答：
+1. 识别它们的一致点。
+2. 指出它们之间的矛盾点或事实错误（如果有）。
+3. 综合给出一个最准确、最全面的最终结论。
+
+---
+${content}`
+}
 
 function replaceDeprecatedBots(bots: BotId[]): BotId[] {
   return bots.map((bot) => {
@@ -39,6 +65,9 @@ const GeneralChatPanel: FC<{
 }> = ({ chats, setBots, supportImageInput }) => {
   const { t } = useTranslation()
   const generating = useMemo(() => chats.some((c) => c.generating), [chats])
+  const uniqueChats = useMemo(() => uniqBy(chats, (c) => c.botId), [chats])
+  const [autoSummarize, setAutoSummarize] = useAtom(autoSummarizeAtom)
+  const [pendingSummary, setPendingSummary] = useState<PendingSummaryState | undefined>(undefined)
   const [layout, setLayout] = useAtom(layoutAtom)
 
   const setPremiumModalOpen = useSetAtom(showPremiumModalAtom)
@@ -65,10 +94,16 @@ const GeneralChatPanel: FC<{
         setPremiumModalOpen('all-in-one-layout')
         return
       }
+      const startCounts = Object.fromEntries(uniqueChats.map((c) => [c.botId, c.messages.length])) as Record<BotId, number>
+      if (autoSummarize) {
+        setPendingSummary({ roundId: uuid(), startCounts, createdAt: Date.now() })
+      } else {
+        setPendingSummary(undefined)
+      }
       uniqBy(chats, (c) => c.botId).forEach((c) => c.sendMessage(input, image))
       trackEvent('send_messages', { layout, disabled })
     },
-    [chats, disabled, layout, setPremiumModalOpen],
+    [autoSummarize, chats, disabled, layout, setPremiumModalOpen, uniqueChats],
   )
 
   const onSwitchBot = useCallback(
@@ -94,6 +129,42 @@ const GeneralChatPanel: FC<{
     [setLayout],
   )
 
+  useEffect(() => {
+    if (!autoSummarize || !pendingSummary) {
+      return
+    }
+
+    const readyResponses = uniqueChats
+      .map((chat) => {
+        const startIndex = pendingSummary.startCounts[chat.botId] ?? chat.messages.length
+        const latestBotMessage = [...chat.messages.slice(startIndex)].reverse().find((m) => m.author === chat.botId && m.text)
+        return { chat, latestBotMessage }
+      })
+      .filter(({ latestBotMessage }) => latestBotMessage && !latestBotMessage.error)
+
+    const allBotsDone = readyResponses.length === uniqueChats.length && uniqueChats.every((c) => !c.generating)
+    const timedOut = Date.now() - pendingSummary.createdAt > SUMMARY_TIMEOUT
+
+    if (!allBotsDone && !(timedOut && readyResponses.length)) {
+      return
+    }
+
+    const prompt = generateSummaryPrompt(
+      readyResponses.map(({ chat, latestBotMessage }) => ({
+        label: CHATBOTS[chat.botId]?.name || chat.botId,
+        text: latestBotMessage!.text,
+      })),
+    )
+
+    const summarizer = uniqueChats[0]
+    if (summarizer) {
+      summarizer.sendMessage(prompt)
+      trackEvent('auto_summarize', { bots: uniqueChats.length, timedOut: !allBotsDone })
+    }
+
+    setPendingSummary(undefined)
+  }, [autoSummarize, pendingSummary, uniqueChats])
+
   return (
     <div className="flex flex-col overflow-hidden h-full">
       <div
@@ -118,8 +189,12 @@ const GeneralChatPanel: FC<{
           />
         ))}
       </div>
-      <div className="flex flex-row gap-3">
+      <div className="flex flex-row gap-3 items-center">
         <LayoutSwitch layout={layout} onChange={onLayoutChange} />
+        <div className="flex items-center gap-2 text-sm text-primary-text">
+          <span className="cursor-default select-none">Auto-Summarize</span>
+          <Toggle enabled={autoSummarize} onChange={setAutoSummarize} />
+        </div>
         <ChatMessageInput
           mode="full"
           className="rounded-2xl bg-primary-background px-4 py-2 grow"
