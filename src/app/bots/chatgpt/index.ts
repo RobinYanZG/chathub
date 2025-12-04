@@ -3,10 +3,7 @@ import * as agent from '~services/agent'
 import { ChatError, ErrorCode } from '~utils/errors'
 import { AsyncAbstractBot, MessageParams } from '../abstract-bot'
 import { ChatGPTApiBot } from '../chatgpt-api'
-import { ChatGPTAzureApiBot } from '../chatgpt-azure'
 import { ChatGPTWebBot } from '../chatgpt-webapp'
-import { PoeWebBot } from '../poe'
-import { OpenRouterBot } from '../openrouter'
 
 export class ChatGPTBot extends AsyncAbstractBot {
   async initializeBot() {
@@ -22,26 +19,6 @@ export class ChatGPTBot extends AsyncAbstractBot {
         chatgptApiTemperature: config.chatgptApiTemperature,
         chatgptApiSystemMessage: config.chatgptApiSystemMessage,
       })
-    }
-    if (chatgptMode === ChatGPTMode.Azure) {
-      if (!config.azureOpenAIApiInstanceName || !config.azureOpenAIApiDeploymentName || !config.azureOpenAIApiKey) {
-        throw new Error('Please check your Azure OpenAI API configuration')
-      }
-      return new ChatGPTAzureApiBot({
-        azureOpenAIApiKey: config.azureOpenAIApiKey,
-        azureOpenAIApiDeploymentName: config.azureOpenAIApiDeploymentName,
-        azureOpenAIApiInstanceName: config.azureOpenAIApiInstanceName,
-      })
-    }
-    if (chatgptMode === ChatGPTMode.Poe) {
-      return new PoeWebBot(config.chatgptPoeModelName)
-    }
-    if (chatgptMode === ChatGPTMode.OpenRouter) {
-      if (!config.openrouterApiKey) {
-        throw new ChatError('OpenRouter API key not set', ErrorCode.API_KEY_NOT_SET)
-      }
-      const model = `openai/${config.openrouterOpenAIModel}`
-      return new OpenRouterBot({ apiKey: config.openrouterApiKey, model })
     }
     return new ChatGPTWebBot(config.chatgptWebappModelName)
   }
