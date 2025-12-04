@@ -10,6 +10,7 @@ import LayoutSwitch from '~app/components/Chat/LayoutSwitch'
 import { CHATBOTS, Layout } from '~app/consts'
 import { useChat } from '~app/hooks/use-chat'
 import { trackEvent } from '~app/plausible'
+import { showPremiumModalAtom } from '~app/state'
 import Toggle from '~app/components/Toggle'
 import { BotId } from '../bots'
 import ConversationPanel from '../components/Chat/ConversationPanel'
@@ -86,10 +87,16 @@ const GeneralChatPanel: FC<{
       } else {
         setPendingSummary(undefined)
       }
+      const startCounts = Object.fromEntries(uniqueChats.map((c) => [c.botId, c.messages.length])) as Record<BotId, number>
+      if (autoSummarize) {
+        setPendingSummary({ roundId: uuid(), startCounts, createdAt: Date.now() })
+      } else {
+        setPendingSummary(undefined)
+      }
       uniqBy(chats, (c) => c.botId).forEach((c) => c.sendMessage(input, image))
       trackEvent('send_messages', { layout, disabled })
     },
-    [autoSummarize, chats, disabled, layout, uniqueChats],
+    [autoSummarize, chats, disabled, layout, setPremiumModalOpen, uniqueChats],
   )
 
   const onSwitchBot = useCallback(
