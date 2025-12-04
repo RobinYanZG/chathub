@@ -1,5 +1,8 @@
-import { BingConversationStyle } from '~services/user-config'
-
+export enum BingConversationStyle {
+  Creative = 'creative',
+  Balanced = 'balanced',
+  Precise = 'precise',
+}
 export interface ConversationResponse {
   conversationId: string
   clientId: string

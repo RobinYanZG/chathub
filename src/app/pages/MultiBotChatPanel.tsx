@@ -9,7 +9,6 @@ import ChatMessageInput from '~app/components/Chat/ChatMessageInput'
 import LayoutSwitch from '~app/components/Chat/LayoutSwitch'
 import { CHATBOTS, Layout } from '~app/consts'
 import { useChat } from '~app/hooks/use-chat'
-import { usePremium } from '~app/hooks/use-premium'
 import { trackEvent } from '~app/plausible'
 import { showPremiumModalAtom } from '~app/state'
 import Toggle from '~app/components/Toggle'
@@ -70,15 +69,7 @@ const GeneralChatPanel: FC<{
   const [pendingSummary, setPendingSummary] = useState<PendingSummaryState | undefined>(undefined)
   const [layout, setLayout] = useAtom(layoutAtom)
 
-  const setPremiumModalOpen = useSetAtom(showPremiumModalAtom)
-  const premiumState = usePremium()
-  const disabled = useMemo(() => !premiumState.isLoading && !premiumState.activated, [premiumState])
-
-  useEffect(() => {
-    if (disabled && (chats.length > 2 || supportImageInput)) {
-      setPremiumModalOpen('all-in-one-layout')
-    }
-  }, [chats.length, disabled, setPremiumModalOpen, supportImageInput])
+  const disabled = false
 
   const sendSingleMessage = useCallback(
     (input: string, botId: BotId) => {
@@ -90,9 +81,11 @@ const GeneralChatPanel: FC<{
 
   const sendAllMessage = useCallback(
     (input: string, image?: File) => {
-      if (disabled && chats.length > 2) {
-        setPremiumModalOpen('all-in-one-layout')
-        return
+      const startCounts = Object.fromEntries(uniqueChats.map((c) => [c.botId, c.messages.length])) as Record<BotId, number>
+      if (autoSummarize) {
+        setPendingSummary({ roundId: uuid(), startCounts, createdAt: Date.now() })
+      } else {
+        setPendingSummary(undefined)
       }
       const startCounts = Object.fromEntries(uniqueChats.map((c) => [c.botId, c.messages.length])) as Record<BotId, number>
       if (autoSummarize) {
@@ -254,8 +247,8 @@ const SixBotChatPanel = () => {
 
 const ImageInputPanel = () => {
   const chat1 = useChat('chatgpt')
-  const chat2 = useChat('bing')
-  const chat3 = useChat('bard')
+  const chat2 = useChat('gemini')
+  const chat3 = useChat('deepseek')
   const chats = useMemo(() => [chat1, chat2, chat3], [chat1, chat2, chat3])
   return <GeneralChatPanel chats={chats} supportImageInput={true} />
 }

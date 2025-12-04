@@ -1,12 +1,12 @@
 import { ofetch } from 'ofetch'
 import WebSocketAsPromised from 'websocket-as-promised'
 import { requestHostPermission } from '~app/utils/permissions'
-import { BingConversationStyle, getUserConfig } from '~services/user-config'
+import { getUserConfig } from '~services/user-config'
 import { uuid } from '~utils'
 import { ChatError, ErrorCode } from '~utils/errors'
 import { AbstractBot, SendMessageParams } from '../abstract-bot'
 import { createConversation } from './api'
-import { ChatResponseMessage, ConversationInfo, InvocationEventType } from './types'
+import { BingConversationStyle, ChatResponseMessage, ConversationInfo, InvocationEventType } from './types'
 import { convertMessageToMarkdown, file2base64, websocketUtils } from './utils'
 
 const OPTIONS_SETS = [

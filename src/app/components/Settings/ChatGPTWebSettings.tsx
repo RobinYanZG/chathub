@@ -22,9 +22,6 @@ const ChatGPWebSettings: FC<Props> = ({ userConfig, updateConfigValue }) => {
           onChange={(v) => updateConfigValue({ chatgptWebappModelName: v })}
         />
       </div>
-      {userConfig.chatgptWebappModelName.startsWith('gpt-4') && (
-        <p className="text-sm text-secondary-text">{t('GPT-4 models require ChatGPT Plus')}</p>
-      )}
     </div>
   )
 }

@@ -21,5 +21,23 @@
     },
     "types": ["chrome-types"]
   },
-  "include": ["src", "vite.config.ts", "manifest.config.ts"]
+  "include": ["src", "vite.config.ts", "manifest.config.ts"],
+  "exclude": [
+    "src/app/bots/bing/**",
+    "src/app/bots/bard/**",
+    "src/app/bots/claude/**",
+    "src/app/bots/claude-api/**",
+    "src/app/bots/perplexity/**",
+    "src/app/bots/perplexity-api/**",
+    "src/app/bots/poe/**",
+    "src/app/bots/chatgpt-azure/**",
+    "src/app/bots/openrouter/**",
+    "src/app/components/Settings/ChatGPTAzureSettings.tsx",
+    "src/app/components/Settings/ChatGPTOpenRouterSettings.tsx",
+    "src/app/components/Settings/ChatGPTPoeSettings.tsx",
+    "src/app/components/Settings/ClaudeAPISettings.tsx",
+    "src/app/components/Settings/ClaudeOpenRouterSettings.tsx",
+    "src/app/components/Settings/ClaudePoeSettings.tsx",
+    "src/app/components/Settings/PerplexityAPISettings.tsx"
+  ]
 }
